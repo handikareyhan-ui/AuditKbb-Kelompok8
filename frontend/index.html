@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nemesis - Kab. Bandung Barat 2026</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
+    <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
+
+    <style>
+        /* CSS UNTUK TAMPILAN MODERN DARK MODE */
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background-color: #0d1117; color: #c9d1d9; margin: 0; padding: 0; overflow: hidden; }
+        
+        .hdr { background-color: #161b22; padding: 15px 25px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; z-index: 100; position: relative; }
+        .hdr-t h1 { margin: 0; color: #58a6ff; font-size: 1.3rem; }
+        .hdr-t span { font-size: 0.75rem; color: #8b949e; }
+
+        .main-container { display: flex; height: calc(100vh - 75px); width: 100%; }
+        
+        /* Area Peta */
+        #map { flex: 2; background: #000; height: 100%; }
+
+        /* Area Daftar Data */
+        .list-section { flex: 1; overflow-y: auto; background: #0d1117; padding: 20px; border-left: 1px solid #30363d; max-width: 450px; }
+        
+        .kpi-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .kpi-item { background: #161b22; padding: 12px; border-radius: 8px; border: 1px solid #30363d; text-align: center; }
+        .kpi-item small { color: #8b949e; display: block; font-size: 0.7rem; margin-bottom: 4px; }
+        .kpi-item strong { font-size: 1rem; color: #f0f6fc; }
+
+        .package-card { background: #1c2128; border-radius: 6px; padding: 14px; margin-bottom: 12px; border: 1px solid #30363d; transition: 0.2s; }
+        .package-card:hover { border-color: #58a6ff; transform: translateX(5px); }
+        .pkg-name { font-weight: bold; font-size: 0.85rem; margin-bottom: 6px; color: #adbac7; }
+        .pkg-pagu { color: #8b949e; font-size: 0.8rem; font-family: monospace; }
+        
+        .tag-container { display: flex; gap: 6px; margin-top: 10px; }
+        .tag { padding: 3px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: bold; text-transform: uppercase; }
+        .tag-umkm { background: rgba(51, 161, 75, 0.15); color: #3fb950; border: 1px solid rgba(63, 185, 80, 0.3); }
+        .tag-anomali { background: rgba(248, 81, 73, 0.15); color: #f85149; border: 1px solid rgba(248, 81, 73, 0.3); }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0d1117; }
+        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <header class="hdr">
+        <div class="hdr-t">
+            <h1>Audit Pengadaan: Kabupaten Bandung Barat</h1>
+            <span>Nemesis v2.0 - Lokalisasi KBB • Deteksi Anomali AI • Peluang UMKM</span>
+        </div>
+        <div style="text-align: right;">
+            <div style="color: #3fb950; font-size: 0.7rem; font-weight: bold;">● LIVE DATA</div>
+            <div style="color: #8b949e; font-size: 0.7rem;">TAHUN ANGGARAN 2026</div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <div id="map"></div>
+        
+        <section class="list-section">
+            <div class="kpi-bar">
+                <div class="kpi-item"><small>TOTAL ANGGARAN</small><strong>Rp 1.2 T</strong></div>
+                <div class="kpi-item"><small>POTENSI UMKM</small><strong style="color:#3fb950">65%</strong></div>
+                <div class="kpi-item"><small>ANOMALI AI</small><strong style="color:#f85149">12%</strong></div>
+            </div>
+
+            <div id="package-list">
+                </div>
+        </section>
+    </main>
+
+    <script>
+        // 1. DATA STATIS KBB (LOKUS)
+        const KBB_DATA = [
+            { id: 1, nama: "Pembangunan Jembatan Penghubung Cisarua", pagu: 4500000000, umkm: false, anomali: true, dinas: "Dinas PUPR", metode: "Tender" },
+            { id: 2, nama: "Pengadaan Makan Minum Rapat Sekda KBB", pagu: 185000000, umkm: true, anomali: false, dinas: "Sekretariat Daerah", metode: "Pengadaan Langsung" },
+            { id: 3, nama: "Pemeliharaan Jalan Lingkar Padalarang", pagu: 2100000000, umkm: false, anomali: false, dinas: "Dinas PUPR", metode: "Tender" },
+            { id: 4, nama: "Jasa Konsultasi IT Dashboard KBB", pagu: 950000000, umkm: false, anomali: true, dinas: "Diskominfo", metode: "Seleksi" },
+            { id: 5, nama: "Pengadaan Bibit Pertanian Lembang", pagu: 120000000, umkm: true, anomali: false, dinas: "Dinas Pertanian", metode: "E-Purchasing" },
+            { id: 6, nama: "Rehabilitasi Ruang Kelas SDN Ngamprah", pagu: 450000000, umkm: true, anomali: false, dinas: "Dinas Pendidikan", metode: "Tender - Prakualifikasi" },
+            { id: 7, nama: "Peningkatan Sarana Air Bersih Cipatat", pagu: 750000000, umkm: false, anomali: false, dinas: "Dinas Perkim", metode: "Tender" },
+            { id: 8, nama: "Alat Tulis Kantor Dinas Pendidikan", pagu: 45000000, umkm: true, anomali: false, dinas: "Dinas Pendidikan", metode: "E-Purchasing" }
+        ];
+
+        // 2. FUNGSI INISIALISASI PETA
+        function initMap() {
+            const map = new maplibregl.Map({
+                container: 'map',
+                style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+                center: [107.51, -6.83], 
+                zoom: 11
+            });
+
+            map.on('load', () => {
+                new maplibregl.Marker({ color: "#58a6ff" })
+                    .setLngLat([107.51, -6.83])
+                    .addTo(map);
+            });
+        }
+
+        // 3. FUNGSI UNTUK MENAMPILKAN DETAIL SAAT DIKLIK
+        function showDetail(id) {
+            const pkg = KBB_DATA.find(p => p.id === id);
+            if (pkg) {
+                alert(`DETAIL PAKET PENGADAAN KBB\n\n` +
+                      `Nama Paket: ${pkg.nama}\n` +
+                      `Pagu: Rp ${pkg.pagu.toLocaleString('id-ID')}\n` +
+                      `Satuan Kerja: ${pkg.dinas}\n` +
+                      `Metode: ${pkg.metode}\n` +
+                      `Status Anomali: ${pkg.anomali ? '⚠ TERDETEKSI' : 'Normal'}\n` +
+                      `Status UMKM: ${pkg.umkm ? '✓ LAYAK UMKM' : '-'}`);
+            }
+        }
+
+        // 4. FUNGSI RENDER DAFTAR DATA
+        function renderList() {
+            const listDiv = document.getElementById('package-list');
+            let html = '<h3 style="margin-bottom:15px; font-size:0.9rem; color:#f0f6fc;">Paket Strategis Wilayah (Klik untuk Detail)</h3>';
+            
+            KBB_DATA.forEach(pkg => {
+                // Tambahkan attribute onclick="showDetail(${pkg.id})" dan cursor:pointer
+                html += `
+                    <div class="package-card" onclick="showDetail(${pkg.id})" style="cursor: pointer;">
+                        <div class="pkg-name">${pkg.nama}</div>
+                        <div class="pkg-pagu">Pagu: Rp ${pkg.pagu.toLocaleString('id-ID')}</div>
+                        <div class="tag-container">
+                            ${pkg.umkm ? '<span class="tag tag-umkm">✓ Peluang UMKM</span>' : ''}
+                            ${pkg.anomali ? '<span class="tag tag-anomali">⚠ Anomali Terdeteksi</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            listDiv.innerHTML = html;
+        }
+
+        window.onload = () => {
+            initMap();
+            renderList();
+        };
+    </script>
+</body>
+</html>
